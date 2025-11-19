@@ -1,0 +1,103 @@
+groups:
+  - name: legal_rag_alerts
+    interval: 30s
+    rules:
+      # API Availability
+      - alert: LegalRAGAPIDown
+        expr: up{job="legal-rag-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Legal RAG API is down"
+          description: "Legal RAG API has been down for more than 2 minutes."
+
+      # Query Performance
+      - alert: HighQueryLatency
+        expr: histogram_quantile(0.95, rate(legal_rag_query_duration_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Alta latencia en consultas legales"
+          description: "El percentil 95 de latencia de consultas es {{ $value }}s (>10s)"
+
+      # Citation Validation Rate
+      - alert: LowCitationValidationRate
+        expr: avg(legal_rag_citation_validation_rate) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          component: citation
+        annotations:
+          summary: "Baja tasa de validación de citas"
+          description: "La tasa de validación de citas es {{ $value }} (<70%)"
+
+      # Error Rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(legal_rag_requests_total{status="error"}[5m]))
+          /
+          sum(rate(legal_rag_requests_total[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Alta tasa de errores"
+          description: "La tasa de errores es {{ $value | humanizePercentage }} (>5%)"
+
+      # Database Connectivity
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is unavailable"
+
+      - alert: Neo4jDown
+        expr: up{job="neo4j"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Neo4j is down"
+          description: "Neo4j graph database is unavailable"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache is unavailable"
+
+      # Resource Usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="legal-rag-api"} > 8e9
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Alto uso de memoria"
+          description: "La API está usando {{ $value | humanize }}B de memoria (>8GB)"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="legal-rag-api"}[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Alto uso de CPU"
+          description: "La API está usando >80% de CPU por {{ $value }} minutos"
